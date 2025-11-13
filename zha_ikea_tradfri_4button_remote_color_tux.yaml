@@ -1,0 +1,225 @@
+blueprint:
+  name: ZHA - IKEA TRADFRI - 4 Button Remote - Color Lights - Christux
+  description: This automation simulates the use of the IKEA TRADFRI remote control
+    connected through ZHA.
+  domain: automation
+  input:
+    remote:
+      name: IKEA TRADFRI remote control 4 buttons
+      description: Select the remote control you wish to use.
+      selector:
+        device:
+          integration: zha
+          manufacturer: IKEA of Sweden
+          model: Remote Control N2
+          multiple: false
+    light:
+      name: Light
+      description: Select the light entity you wish to control.
+      selector:
+        entity:
+          domain:
+          - light
+          multiple: false
+    min_temp:
+      name: Minimal temperature of light
+      description: The minimal temprature of the light
+      selector:
+        number:
+          min: 154.0
+          max: 500.0
+          unit_of_measurement: mireds
+          mode: slider
+          step: 1.0
+      default: 370
+    max_temp:
+      name: Maximal temperature of light
+      description: The maximal temprature of the light
+      selector:
+        number:
+          min: 154.0
+          max: 500.0
+          unit_of_measurement: mireds
+          mode: slider
+          step: 1.0
+      default: 454
+    speed:
+      name: Speed
+      description: The speed in which to update the light when the button is held.
+      selector:
+        number:
+          min: 100.0
+          max: 1000.0
+          step: 100.0
+          unit_of_measurement: milliseconds
+          mode: slider
+      default: 500
+mode: restart
+max_exceeded: silent
+variables:
+  var_light: !input light
+  var_speed: !input speed
+  min_temp: !input min_temp
+  max_temp: !input max_temp
+  var_dim_step: 5
+trigger:
+- platform: event
+  event_type: zha_event
+  event_data:
+    device_id: !input remote
+action:
+- variables:
+    command: "{{ trigger.event.data.command }}"
+    cluster_id: "{{ trigger.event.data.cluster_id }}"
+    endpoint_id: "{{ trigger.event.data.endpoint_id }}"
+    args: "{{ trigger.event.data.args }}"
+- choose:
+  # Short press on ON button
+  - conditions:
+    - "{{ command == 'on' }}"
+    - "{{ cluster_id == 6 }}"
+    - "{{ endpoint_id == 1 }}"
+    sequence:
+    - service: light.turn_on
+      target:
+        entity_id: !input light
+      data:
+        transition: 1
+  # Chort press on OFF button
+  - conditions:
+    - "{{ command == 'off' }}"
+    - "{{ cluster_id == 6 }}"
+    - "{{ endpoint_id == 1 }}"
+    sequence:
+    - service: light.turn_off
+      target:
+        entity_id: !input light
+      data:
+        transition: 1
+  # Long press on ON button
+  - conditions:
+    - "{{ command == 'move_with_on_off' }}"
+    - "{{ cluster_id == 8 }}"
+    - "{{ endpoint_id == 1 }}"
+    sequence:
+    - repeat:
+        while: []
+        sequence:
+        - service: light.turn_on
+          target:
+            entity_id: !input light
+          data:
+            brightness_step_pct: "{{ var_dim_step }}"
+            transition: "{{ (var_speed / 1000)|float }}"
+        - delay:
+            milliseconds: !input speed
+  # Long press on OFF button
+  - conditions:
+    - "{{ command == 'move' }}"
+    - "{{ cluster_id == 8 }}"
+    - "{{ endpoint_id == 1 }}"
+    sequence:
+    - repeat:
+        while:
+        - condition: template
+          value_template: "{{ (state_attr(var_light, 'brightness') | int * 100 / 255) | int > var_dim_step }}"
+        sequence:
+        # - service: logbook.log
+        #   data:
+        #     name: "DEBUG"
+        #     message: "brightness = {{ (state_attr(var_light, 'brightness') | int * 100 / 255) | int }}"
+        - service: light.turn_on
+          target:
+            entity_id: !input light
+          data:
+            brightness_step_pct: "{{ var_dim_step | int * -1 }}"
+            transition: '{{ (var_speed / 1000)|float }}'
+        - delay:
+            milliseconds: !input speed
+  # Short press on RIGHT button
+  - conditions:
+    - "{{ command == 'press' }}"
+    - "{{ cluster_id == 5 }}"
+    - "{{ endpoint_id == 1 }}"
+    - "{{ args == [256, 13, 0] }}"
+    sequence:
+    - service: light.turn_on
+      target:
+        entity_id: !input light
+      data:
+        hs_color: 
+          - >-
+            {% if state_attr(var_light, "hs_color")[0] + 18 > 360 %}
+              {{ state_attr(var_light, "hs_color")[0] + 18 - 360 }}
+            {% else %}
+              {{ state_attr(var_light, "hs_color")[0] + 18 }}
+            {% endif %}
+          - "{{ state_attr(var_light, 'hs_color')[1] }}"
+        transition: '{{ (var_speed / 1000)|float }}'
+# Long press on RIGHT button
+  - conditions:
+    - "{{ command == 'hold' }}"
+    - "{{ cluster_id == 5 }}"
+    - "{{ endpoint_id == 1 }}"
+    - "{{ args == [3328, 0] }}"
+    sequence:
+    - repeat:
+        while: []
+        sequence:
+        - service: light.turn_on
+          target:
+            entity_id: !input light
+          data:
+            hs_color:
+              - >-
+                {% if state_attr(var_light, "hs_color")[0] + 18 > 360 %}
+                  {{ state_attr(var_light, "hs_color")[0] + 18 - 360 }}
+                {% else %}
+                  {{ state_attr(var_light, "hs_color")[0] + 18 }}
+                {% endif %}
+              - "{{ state_attr(var_light, 'hs_color')[1] }}"
+            transition: "{{ (var_speed / 1000)|float }}"
+        - delay:
+            milliseconds: !input speed
+  # Short press on LEFT button
+  - conditions:
+    - "{{ command == 'press' }}"
+    - "{{ cluster_id == 5 }}"
+    - "{{ endpoint_id == 1 }}"
+    - "{{ args == [257, 13, 0] }}"
+    sequence:
+    - service: light.turn_on
+      target:
+        entity_id: !input light
+      data:
+        color_temp: >-
+          {% if state_attr(var_light, "color_temp") == None or state_attr(var_light, "color_temp") + 15 > max_temp %}
+            {{ min_temp }}
+          {% else %}
+            {{ state_attr(var_light, "color_temp") + 15 }}
+          {% endif %}
+        transition: "{{ (var_speed / 1000)|float }}"
+  # Long press on LEFT button
+  - conditions:
+    - "{{ command == 'hold' }}"
+    - "{{ cluster_id == 5 }}"
+    - "{{ endpoint_id == 1 }}"
+    - "{{ args == [3329, 0] }}"
+    sequence:
+    - repeat:
+        while: []
+        sequence:
+        - service: light.turn_on
+          target:
+            entity_id: !input light
+          data:
+            color_temp: >-
+              {% if state_attr(var_light, "color_temp") == None or state_attr(var_light, "color_temp") + 15 > max_temp %}
+                {{ min_temp }}
+              {% else %}
+                {{ state_attr(var_light, "color_temp") + 15 }}
+              {% endif %}
+            transition: "{{ (var_speed / 1000)|float }}"
+        - delay:
+            milliseconds: !input speed
+  default: []
