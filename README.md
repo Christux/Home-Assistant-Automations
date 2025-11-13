@@ -61,6 +61,7 @@ This automation maps the remote’s buttons to intuitive lighting controls that 
 
 Special thanks to the authors and community members whose scripts and discussions inspired these automations.
 
-- [Author Name / Link]  
-- [Author Name / Link]  
-- [To be completed by Christux]
+- [Orce MARINKOVSKI / [Link](https://gist.github.com/orcema/c282c72ddc549060fb10999dbe774526)]  
+- [Malte / [Link](https://community.home-assistant.io/t/zha-ikea-four-button-remote-styrbar-for-lights-e2001-e2002/384482)]  
+- [Damien Rubio / [Link](https://gist.github.com/damru/19ac1c8530cf744595a9e239cf5bb20f)]  
+- [hugalafutro / [Link](https://gist.github.com/hugalafutro/07a15a55d1e8394744e423a9ce7c8223)]
